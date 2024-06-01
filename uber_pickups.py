@@ -1,37 +1,34 @@
-
-
-import streamlit as st
 import pandas as pd
-import numpy as np
+import plotly.express as px
+import streamlit as st
 
-st.title('Uber pickups in NYC')
+# Load the dataset
+df = pd.read_csv('C:\\Users\\vikto\\Documents\\CAs\\datasets\\GlobalLandTemperaturesByCountry.csv')
 
-DATE_COLUMN = 'date/time'
-DATA_URL = ('https://s3-us-west-2.amazonaws.com/streamlit-demo-data/uber-raw-data-sep14.csv.gz')
+# Parse the date column
+df['dt'] = pd.to_datetime(df['dt'])
 
-@st.cache_data
-def load_data(nrows):
-    data = pd.read_csv(DATA_URL, nrows=nrows)
-    lowercase = lambda x: str(x).lower()
-    data.rename(lowercase, axis='columns', inplace=True)
-    data[DATE_COLUMN] = pd.to_datetime(data[DATE_COLUMN])
-    return data
+# Filter data for the past 5 years
+recent_years = df['dt'].dt.year.max() - 5
+df_recent = df[df['dt'].dt.year > recent_years]
 
-data_load_state = st.text('Loading data...')
-data = load_data(10000)
-data_load_state.text("Done! (using st.cache_data)")
+# Filter data for specific continents
+continents = ['Africa', 'Asia', 'Europe', 'North America', 'Oceania', 'South America']
+df_recent = df_recent[df_recent['Country'].isin(continents)]
 
-if st.checkbox('Show raw data'):
-    st.subheader('Raw data')
-    st.write(data)
+# Extract year from the date column
+df_recent['Year'] = df_recent['dt'].dt.year
 
-st.subheader('Number of pickups by hour')
-hist_values = np.histogram(data[DATE_COLUMN].dt.hour, bins=24, range=(0,24))[0]
-st.bar_chart(hist_values)
+# Group by Year and Continent, and calculate the mean temperature
+df_yearly_continent = df_recent.groupby(['Year', 'Country'])['AverageTemperature'].mean().reset_index()
 
-# Some number in the range 0-23
-hour_to_filter = st.slider('hour', 0, 23, 17)
-filtered_data = data[data[DATE_COLUMN].dt.hour == hour_to_filter]
+# Streamlit app
+st.title('Interactive Yearly Average Temperatures for Continents (Past 5 Years)')
 
-st.subheader('Map of all pickups at %s:00' % hour_to_filter)
-st.map(filtered_data)
+# Create a plotly line plot
+fig = px.line(df_yearly_continent, x='Year', y='AverageTemperature', color='Country', markers=True,
+              title='Yearly Average Temperatures for Continents (Past 5 Years)',
+              labels={'AverageTemperature': 'Average Temperature (°C)', 'Country': 'Continent'})
+
+# Show the plot
+st.plotly_chart(fig)
